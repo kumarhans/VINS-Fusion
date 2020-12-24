@@ -10,6 +10,7 @@
  *******************************************************/
 
 #include "feature_tracker.h"
+#include "../utility/visualization.h"
 
 bool FeatureTracker::inBorder(const cv::Point2f &pt)
 {
@@ -109,6 +110,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     */
     cur_pts.clear();
 
+    int trackedNum = 0;
+
     if (prev_pts.size() > 0)
     {
         TicToc t_o;
@@ -158,9 +161,14 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         reduceVector(ids, status);
         reduceVector(track_cnt, status);
         ROS_DEBUG("temporal optical flow costs: %fms", t_o.toc());
-        //printf("track cnt %d\n", (int)ids.size());
+        
     }
 
+    //printf("track cnt %d\n", (int)cur_pts.size());
+    trackedNum  =(int)cur_pts.size();
+
+    pubTrackCount(trackedNum);
+    
     for (auto &n : track_cnt)
         n++;
 
@@ -194,6 +202,7 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
             track_cnt.push_back(1);
         }
         //printf("feature cnt after add %d\n", (int)ids.size());
+        //printf("track cnt %d\n", (int)ids.size());
     }
 
     cur_un_pts = undistortedPts(cur_pts, m_camera[0]);
@@ -246,6 +255,8 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
     if(SHOW_TRACK)
         drawTrack(cur_img, rightImg, ids, cur_pts, cur_right_pts, prevLeftPtsMap);
 
+
+     
     prev_img = cur_img;
     prev_pts = cur_pts;
     prev_un_pts = cur_un_pts;
@@ -301,9 +312,14 @@ map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> FeatureTracker::trackIm
         }
     }
 
+    //printf("track cnt %d\n", (int)ids.size());
+    
+
     //printf("feature track whole time %f\n", t_r.toc());
     return featureFrame;
 }
+
+
 
 void FeatureTracker::rejectWithF()
 {

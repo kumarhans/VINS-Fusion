@@ -17,6 +17,7 @@ ros::Publisher pub_point_cloud, pub_margin_cloud;
 ros::Publisher pub_key_poses;
 ros::Publisher pub_camera_pose;
 ros::Publisher pub_camera_pose_visual;
+ros::Publisher pub_track;
 nav_msgs::Path path;
 
 ros::Publisher pub_keyframe_pose;
@@ -45,6 +46,7 @@ void registerPub(ros::NodeHandle &n)
     pub_keyframe_point = n.advertise<sensor_msgs::PointCloud>("keyframe_point", 1000);
     pub_extrinsic = n.advertise<nav_msgs::Odometry>("extrinsic", 1000);
     pub_image_track = n.advertise<sensor_msgs::Image>("image_track", 1000);
+    pub_track = n.advertise<std_msgs::Int32>("track_count", 1000);;
 
     cameraposevisual.setScale(0.1);
     cameraposevisual.setLineWidth(0.01);
@@ -66,6 +68,25 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     odometry.twist.twist.linear.y = V.y();
     odometry.twist.twist.linear.z = V.z();
     pub_latest_odometry.publish(odometry);
+
+
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    tf::Quaternion q;
+    // body frame
+    transform.setOrigin(tf::Vector3(P.x(),
+                                    P.y(),
+                                    P.z()));
+
+    q.setW(Q.w());
+    q.setX(Q.x());
+    q.setY(Q.y());
+    q.setZ(Q.z());
+    transform.setRotation(q);
+    br.sendTransform(tf::StampedTransform(transform, odometry.header.stamp, "world", "bodyIMU"));
+
+
+
 }
 
 void pubTrackImage(const cv::Mat &imgTrack, const double t)
@@ -77,6 +98,13 @@ void pubTrackImage(const cv::Mat &imgTrack, const double t)
     pub_image_track.publish(imgTrackMsg);
 }
 
+
+void pubTrackCount(const int count){
+    std_msgs::Int32 msg;
+    msg.data = count;
+    pub_track.publish(msg);
+
+}
 
 void printStatistics(const Estimator &estimator, double t)
 {

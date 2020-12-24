@@ -68,6 +68,20 @@ void Estimator::clearState()
         ric[i] = Matrix3d::Identity();
     }
 
+    double angle = 0.0;  // if realsense is mounted horizontally
+    Eigen::Matrix3d Rbi;
+    Rbi.setZero();
+    Rbi <<  cos(angle),           0,               sin(angle),
+            0,  1,      0, 
+            -sin(angle), 0,      cos(angle);
+  
+    Eigen::Vector3d Tbi(0.0, 0, 1.25);
+
+
+
+    Rs[0] = Rbi;
+    Ps[0] = Tbi;
+
     first_imu = false,
     sum_of_back = 0;
     sum_of_front = 0;
@@ -168,6 +182,7 @@ void Estimator::inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1)
     else
         featureFrame = featureTracker.trackImage(t, _img, _img1);
     //printf("featureTracker time: %f\n", featureTrackerTime.toc());
+    //printf("track cnt %d\n", (int)(featureFrame.size()));
 
     if (SHOW_TRACK)
     {
@@ -201,6 +216,8 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
     mBuf.lock();
     accBuf.push(make_pair(t, linearAcceleration));
     gyrBuf.push(make_pair(t, angularVelocity));
+
+    
     //printf("input imu with time %f \n", t);
     mBuf.unlock();
 
@@ -358,7 +375,21 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
     Matrix3d R0 = Utility::g2R(averAcc);
     double yaw = Utility::R2ypr(R0).x();
     R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
-    Rs[0] = R0;
+
+
+    double angle = 0.0;  // if realsense is mounted horizontally
+    Eigen::Matrix3d Rbi;
+    Rbi.setZero();
+    Rbi <<  1,           0,               0,
+            0,  cos(angle),      sin(angle), 
+            0, -sin(angle),      cos(angle);
+  
+    Eigen::Vector3d Tbi(0.0, 0, 2);
+
+
+
+    Rs[0] = Rbi;
+    Ps[0] = Tbi;
     cout << "init R0 " << endl << Rs[0] << endl;
     //Vs[0] = Vector3d(5, 0, 0);
 }
@@ -1107,7 +1138,8 @@ void Estimator::optimization()
         }
     }
 
-    ROS_DEBUG("visual measurement count: %d", f_m_cnt);
+    ROS_DEBUG("visual measurement count: %d \n", f_m_cnt);
+    //printf("visual measurement count: %d \n", f_m_cnt);
     //printf("prepare for ceres: %f \n", t_prepare.toc());
 
     ceres::Solver::Options options;

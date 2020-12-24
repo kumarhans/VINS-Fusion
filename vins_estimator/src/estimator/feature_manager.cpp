@@ -9,6 +9,7 @@
 
 #include "feature_manager.h"
 
+
 int FeaturePerId::endFrame()
 {
     return start_frame + feature_per_frame.size() - 1;
