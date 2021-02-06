@@ -20,7 +20,8 @@
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
-
+#include <gazebo_msgs/LinkStates.h>
+#include <tf/transform_datatypes.h>
 
 
 Estimator estimator;
@@ -30,7 +31,8 @@ queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
-
+double currPitch = 0.0;
+bool start = false;
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
 {
@@ -50,7 +52,7 @@ void img1_callback(const sensor_msgs::ImageConstPtr &img_msg)
 cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg)
 {
     cv_bridge::CvImageConstPtr ptr;
-    if (img_msg->encoding == "8UC1")
+    if (img_msg->encoding == "11UC1")
     {
         sensor_msgs::Image img;
         img.header = img_msg->header;
@@ -109,9 +111,61 @@ void sync_process()
                 }
             }
             m_buf.unlock();
-            if(!image0.empty())
-                estimator.inputImage(time, image0, image1);
+            if(!image0.empty()){
+                if (IMAGE0_TOPIC == "/mobile_robot/simulated/camera/left/image_raw"){
+                    estimator.inputImage(time, image0, image1);
+                } else if (currPitch < -.38){
+                    cout << currPitch << endl;
+                    start = true;
+                    estimator.inputImage(time, image0, image1);
+                } else if (!start && abs(currPitch) < .05){
+                    estimator.inputImage(time, image0, image1);
+                }
+            }
+
         }
+        
+        // if (STEREO)
+        // {
+        //     cv::Mat image0, image1;
+        //     std_msgs::Header header;
+        //     double time;
+        //     m_buf.lock();
+        //     if (img0_buf.size() > 2 && img1_buf.size() > 2)
+        //     {
+                 
+        //         image0 = .15*getImageFromMsg(img0_buf.front());
+        //         img0_buf.pop();
+        //         time = img0_buf.front()->header.stamp.toSec();
+        //         header = img0_buf.front()->header;
+        //         image0 += .7*getImageFromMsg(img0_buf.front());
+        //         img0_buf.pop();
+        //         image0 += .15*getImageFromMsg(img0_buf.front());
+        //         img0_buf.pop();
+
+        //         image1 = .15*getImageFromMsg(img1_buf.front());
+        //         img1_buf.pop();
+        //         image1 += .7*getImageFromMsg(img1_buf.front());
+        //         img1_buf.pop();
+        //         image1 += .15*getImageFromMsg(img1_buf.front());
+        //         img1_buf.pop();
+                
+        //     }
+        //     m_buf.unlock();
+        //     if(!image0.empty()){
+        //         if (IMAGE0_TOPIC == "/mobile_robot/simulated/camera/left/image_raw"){
+        //             estimator.inputImage(time, image0, image1);
+        //         } else if (currPitch < -.23){
+        //             start = true;
+        //             estimator.inputImage(time, image0, image1);
+        //         } else if (!start){
+        //             estimator.inputImage(time, image0, image1);
+        //         }
+                 
+                
+        //     }
+                
+        // }
         else
         {
             cv::Mat image;
@@ -127,6 +181,7 @@ void sync_process()
             }
             m_buf.unlock();
             if(!image.empty())
+                
                 estimator.inputImage(time, image);
         }
 
@@ -140,13 +195,40 @@ void imu_callback(const sensor_msgs::ImuConstPtr &imu_msg)
 {
     double t = imu_msg->header.stamp.toSec();
     double dx = imu_msg->linear_acceleration.x;
-    double dy = imu_msg->linear_acceleration.y;
+    double dy = imu_msg->linear_acceleration.y*0.0;
     double dz = imu_msg->linear_acceleration.z;
     double rx = imu_msg->angular_velocity.x;
     double ry = imu_msg->angular_velocity.y;
     double rz = imu_msg->angular_velocity.z;
     Vector3d acc(dx, dy, dz);
     Vector3d gyr(rx, ry, rz);
+
+    // //Rotate in Z by -pi
+    // Eigen::Matrix3d rotOne;
+    // double angleOne = 1.57079;
+    // rotOne.setZero();
+    // rotOne <<  cos(angleOne),   sin(angleOne),    0,
+    //            -sin(angleOne),  cos(angleOne),    0, 
+    //               0,               0,         1;
+
+    // //Rotate in Y by -pi/2
+    // Eigen::Matrix3d rotTwo;
+    // double angleTwo = 1.570796;
+    // rotTwo.setZero();
+    // rotTwo <<  cos(angleTwo),   0,        sin(angleTwo),    
+    //         0,                1,                      0,
+    //           -sin(angleTwo),  0,          cos(angleTwo);
+
+
+    // Vector3d accCorr = rotTwo*rotOne*acc;
+    // Vector3d gyrCorr = rotTwo*rotOne*gyr;
+    // //accCorr[2] = 9.81;
+
+    // cout << "raw Acceleration: " << acc << endl;
+    // cout << "raw Acceleration rot1: " << rotOne*acc << endl;
+    // cout << "corrected Acceleration: " << accCorr << endl;
+
+
     estimator.inputIMU(t, acc, gyr);
     return;
 }
@@ -225,6 +307,15 @@ void cam_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
     return;
 }
 
+void gazCallback(const gazebo_msgs::LinkStates &msgs){
+    tf::Quaternion q(msgs.pose[11].orientation.w, msgs.pose[11].orientation.x, msgs.pose[11].orientation.y,msgs.pose[11].orientation.z);
+    tf::Matrix3x3 m(q);
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+    currPitch = pitch;
+}
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "vins_estimator");
@@ -255,9 +346,9 @@ int main(int argc, char **argv)
 
     ros::Subscriber sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
-    ros::Subscriber sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
-
+    ros::Subscriber sub_img0 = n.subscribe("/mobile_robot/simulated/camera/left/image_raw", 100, img0_callback);
+    ros::Subscriber sub_img1 = n.subscribe("/mobile_robot/simulated/camera/right/image_raw", 100, img1_callback);
+    ros::Subscriber gazSUB = n.subscribe("/gazebo/link_states", 1000, gazCallback);
     
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);

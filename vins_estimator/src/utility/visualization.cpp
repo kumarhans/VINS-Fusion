@@ -83,7 +83,7 @@ void pubLatestOdometry(const Eigen::Vector3d &P, const Eigen::Quaterniond &Q, co
     q.setY(Q.y());
     q.setZ(Q.z());
     transform.setRotation(q);
-    br.sendTransform(tf::StampedTransform(transform, odometry.header.stamp, "world", "bodyIMU"));
+    br.sendTransform(tf::StampedTransform(transform, odometry.header.stamp, "world",  IMAGE0_TOPIC));
 
 
 
@@ -157,11 +157,31 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         odometry.header = header;
         odometry.header.frame_id = "world";
         odometry.child_frame_id = "world";
+
+        double angle = 0.0;//-1.570796;  // if realsense is mounted horizontally
+        Eigen::Matrix3d Rbi;
+        Rbi.setZero();
+        Rbi <<  cos(angle),           sin(angle),               0,
+                -sin(angle),  cos(angle),      0, 
+                0, 0,      1;
+ 
+        //Eigen::Vector3d Tbi(3.75, 0.0, 1.25);
+        Eigen::Vector3d Tbi(0.0, 0.0, 1.25);
+        Eigen::MatrixXd HTran = MatrixXd::Identity(4, 4);
+        HTran.block<3,3>(0,0) = Rbi;
+        HTran.block<3,1>(0,3) = Tbi;
+
+        Eigen::MatrixXd H = MatrixXd::Identity(4, 4);
+        H.block<3,3>(0,0) = estimator.Rs[WINDOW_SIZE];
+        H.block<3,1>(0,3) = estimator.Ps[WINDOW_SIZE];
+
+        Eigen::MatrixXd HNew = HTran*H;
+
         Quaterniond tmp_Q;
-        tmp_Q = Quaterniond(estimator.Rs[WINDOW_SIZE]);
-        odometry.pose.pose.position.x = estimator.Ps[WINDOW_SIZE].x();
-        odometry.pose.pose.position.y = estimator.Ps[WINDOW_SIZE].y();
-        odometry.pose.pose.position.z = estimator.Ps[WINDOW_SIZE].z();
+        tmp_Q = Quaterniond(HNew.block<3,3>(0,0));//Quaterniond(estimator.Rs[WINDOW_SIZE]);
+        odometry.pose.pose.position.x = HNew(0,3);//estimator.Ps[WINDOW_SIZE].x();
+        odometry.pose.pose.position.y = HNew(1,3);//estimator.Ps[WINDOW_SIZE].y();
+        odometry.pose.pose.position.z = HNew(2,3);//estimator.Ps[WINDOW_SIZE].z();
         odometry.pose.pose.orientation.x = tmp_Q.x();
         odometry.pose.pose.orientation.y = tmp_Q.y();
         odometry.pose.pose.orientation.z = tmp_Q.z();

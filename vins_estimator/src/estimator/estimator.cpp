@@ -68,14 +68,19 @@ void Estimator::clearState()
         ric[i] = Matrix3d::Identity();
     }
 
-    double angle = 0.0;  // if realsense is mounted horizontally
+    double angle = 0;//-1.570796;  // if realsense is mounted horizontally
     Eigen::Matrix3d Rbi;
     Rbi.setZero();
-    Rbi <<  cos(angle),           0,               sin(angle),
-            0,  1,      0, 
-            -sin(angle), 0,      cos(angle);
+    Rbi <<  cos(angle),           sin(angle),               0,
+            -sin(angle),  cos(angle),      0, 
+            0, 0,      1;
+
+    // Rbi <<  cos(angle),           0,               sin(angle),
+    //             0 ,  1, 0, 
+    //         -sin(angle), 0,      cos(angle);
   
-    Eigen::Vector3d Tbi(0.0, 0, 1.25);
+    //Eigen::Vector3d Tbi(3.75, 0.0, 1.25);
+    Eigen::Vector3d Tbi(0.0, 0.0, 0.0);
 
 
 
@@ -291,8 +296,10 @@ void Estimator::processMeasurements()
         //printf("process measurments\n");
         pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
+        //cout << featureBuf.size() << endl;
         if(!featureBuf.empty())
-        {
+        {   
+            printf("process measurments\n");
             feature = featureBuf.front();
             curTime = feature.first + td;
             while(1)
@@ -377,16 +384,24 @@ void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVecto
     R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
 
 
-    double angle = 0.0;  // if realsense is mounted horizontally
+    double angle = 0;//-1.570796;  // if realsense is mounted horizontally
     Eigen::Matrix3d Rbi;
     Rbi.setZero();
-    Rbi <<  1,           0,               0,
-            0,  cos(angle),      sin(angle), 
-            0, -sin(angle),      cos(angle);
+    Rbi <<   cos(angle),           sin(angle),               0,
+            -sin(angle),           cos(angle),               0, 
+                      0,                    0,               1;
+
+    
+
+    // Rbi <<  cos(angle),           0,               sin(angle),
+    //             0 ,  1, 0, 
+    //         -sin(angle), 0,      cos(angle);
   
-    Eigen::Vector3d Tbi(0.0, 0, 2);
+    //Eigen::Vector3d Tbi(3.75, 0.0, 1.25);
+    Eigen::Vector3d Tbi(0.0, 0.0, 0.0);
 
-
+    //-pi on z
+    //-pi/2 on y
 
     Rs[0] = Rbi;
     Ps[0] = Tbi;
@@ -582,7 +597,7 @@ void Estimator::processImage(const map<int, vector<pair<int, Eigen::Matrix<doubl
         }
             
         ROS_DEBUG("solver costs: %fms", t_solve.toc());
-
+        cout << "solver costs: " <<  t_solve.toc() << endl;
         if (failureDetection())
         {
             ROS_WARN("failure detection!");
