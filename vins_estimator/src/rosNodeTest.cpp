@@ -118,7 +118,7 @@ void sync_process()
                     cout << currPitch << endl;
                     start = true;
                     estimator.inputImage(time, image0, image1);
-                } else if (!start && abs(currPitch) < .05){
+                } else if (!start && abs(currPitch) < .06){
                     estimator.inputImage(time, image0, image1);
                 }
             }
@@ -308,7 +308,7 @@ void cam_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
 }
 
 void gazCallback(const gazebo_msgs::LinkStates &msgs){
-    tf::Quaternion q(msgs.pose[11].orientation.w, msgs.pose[11].orientation.x, msgs.pose[11].orientation.y,msgs.pose[11].orientation.z);
+    tf::Quaternion q(msgs.pose[8].orientation.w, msgs.pose[8].orientation.x, msgs.pose[8].orientation.y,msgs.pose[8].orientation.z);
     tf::Matrix3x3 m(q);
     double roll, pitch, yaw;
     m.getRPY(roll, pitch, yaw);

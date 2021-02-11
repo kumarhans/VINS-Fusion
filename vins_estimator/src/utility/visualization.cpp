@@ -102,8 +102,7 @@ void pubTrackImage(const cv::Mat &imgTrack, const double t)
 void pubTrackCount(const int count){
     std_msgs::Int32 msg;
     msg.data = count;
-    pub_track.publish(msg);
-
+    pub_track.publish(msg); 
 }
 
 void printStatistics(const Estimator &estimator, double t)
@@ -158,15 +157,15 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         odometry.header.frame_id = "world";
         odometry.child_frame_id = "world";
 
-        double angle = 0.0;//-1.570796;  // if realsense is mounted horizontally
+        double angle = -1.570796;  //0.0;// if realsense is mounted horizontally
         Eigen::Matrix3d Rbi;
         Rbi.setZero();
         Rbi <<  cos(angle),           sin(angle),               0,
                 -sin(angle),  cos(angle),      0, 
                 0, 0,      1;
  
-        //Eigen::Vector3d Tbi(3.75, 0.0, 1.25);
-        Eigen::Vector3d Tbi(0.0, 0.0, 1.25);
+        Eigen::Vector3d Tbi(2.0, 0.0, 1.25);
+        //Eigen::Vector3d Tbi(0.0, 0.0, 1.25);
         Eigen::MatrixXd HTran = MatrixXd::Identity(4, 4);
         HTran.block<3,3>(0,0) = Rbi;
         HTran.block<3,1>(0,3) = Tbi;
